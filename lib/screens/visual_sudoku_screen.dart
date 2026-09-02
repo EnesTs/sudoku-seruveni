@@ -374,7 +374,6 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
     bool colComplete = true;
     bool boxComplete = true;
 
-    // Satır kontrolü
     for (int col = 0; col < 9; col++) {
       if (_board[r][col].userValue != _board[r][col].value) rowComplete = false;
     }
@@ -382,7 +381,6 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
       for (int col = 0; col < 9; col++) newGroupCells.add('$r-$col');
     }
 
-    // Sütun kontrolü
     for (int row = 0; row < 9; row++) {
       if (_board[row][c].userValue != _board[row][c].value) colComplete = false;
     }
@@ -390,7 +388,6 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
       for (int row = 0; row < 9; row++) newGroupCells.add('$row-$c');
     }
 
-    // 3x3 Kutu kontrolü
     int boxStartRow = (r ~/ 3) * 3;
     int boxStartCol = (c ~/ 3) * 3;
     for (int br = boxStartRow; br < boxStartRow + 3; br++) {
@@ -420,7 +417,6 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
         }
       });
 
-      // Hangi yapının tamamlandığını nokta atışı tetikliyoruz
       _handleMoveFeedback(isRowDone: rowComplete, isColDone: colComplete && !rowComplete, isBoxDone: boxComplete && !rowComplete && !colComplete);
       return true;
     }
@@ -1110,7 +1106,6 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
 
         _buildProgressBar(currentTheme),
 
-        // --- İLERLEME BARI İLE TAHTA ARASINDAKİ MOTİVASYON ALANI ---
         SizedBox(
           height: 32,
           child: Center(
@@ -1177,7 +1172,20 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
                           bool isConflict = _highlightedConflictCells.contains(cellKey);
                           bool isJustCompletedGroup = _recentlyCompletedGroupCells.contains(cellKey);
 
+                          int? selectedNumber;
+                          if (_selectedRow != null && _selectedCol != null) {
+                            ClassicCell selectedCell = _board[_selectedRow!][_selectedCol!];
+                            selectedNumber = selectedCell.userValue ?? (selectedCell.isInitial ? selectedCell.value : null);
+                          }
+
+                          int? currentCellNum = cell.userValue ?? (cell.isInitial ? cell.value : null);
+                          bool isSameNumber = selectedNumber != null && currentCellNum != null && currentCellNum == selectedNumber;
+
                           Color bgColor = Colors.transparent;
+                          Border? customBorder;
+
+                          BorderSide thickBorder = BorderSide(color: currentTheme.gridBorderColor, width: 2.0);
+                          BorderSide thinBorder = BorderSide(color: currentTheme.gridBorderColor.withOpacity(0.3), width: 1.0);
 
                           if (_currentVisualTheme == VisualThemeType.colors && cell.userValue != null) {
                             bgColor = VisualThemeData.colorPalette[cell.userValue!] ?? Colors.transparent;
@@ -1187,12 +1195,23 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
                             bgColor = Colors.amber.shade300;
                           } else if (isSelected) {
                             bgColor = currentTheme.selectedCellColor;
+                          } else if (isSameNumber) {
+                            bgColor = currentTheme.selectedCellColor.withOpacity(0.9);
                           } else if (isSameRowOrCol || isSameBox) {
                             bgColor = currentTheme.selectedCellColor.withOpacity(0.35);
                           }
 
-                          BorderSide thickBorder = BorderSide(color: currentTheme.gridBorderColor, width: 2.0);
-                          BorderSide thinBorder = BorderSide(color: currentTheme.gridBorderColor.withOpacity(0.3), width: 1.0);
+                          // Seçilen veya aynı numaraya sahip karelerin altın sarısı çerçeve ile parlaması
+                          if (isSelected || isSameNumber) {
+                            customBorder = Border.all(color: const Color(0xFFFFD700), width: 2.5);
+                          }
+
+                          Border finalBorder = customBorder ?? Border(
+                            top: r % 3 == 0 ? thickBorder : thinBorder,
+                            left: c % 3 == 0 ? thickBorder : thinBorder,
+                            bottom: r == 8 ? thickBorder : BorderSide.none,
+                            right: c == 8 ? thickBorder : BorderSide.none,
+                          );
 
                           return GestureDetector(
                             onTap: () {
@@ -1206,12 +1225,7 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
                               duration: const Duration(milliseconds: 300),
                               decoration: BoxDecoration(
                                 color: bgColor,
-                                border: Border(
-                                  top: r % 3 == 0 ? thickBorder : thinBorder,
-                                  left: c % 3 == 0 ? thickBorder : thinBorder,
-                                  bottom: r == 8 ? thickBorder : BorderSide.none,
-                                  right: c == 8 ? thickBorder : BorderSide.none,
-                                ),
+                                border: finalBorder,
                               ),
                               child: Center(child: _buildVisualCellContent(cell, mapping)),
                             ),
@@ -1396,7 +1410,7 @@ class _VisualSudokuScreenState extends State<VisualSudokuScreen> {
         return const SizedBox();
       }
 
-      String symbol = mapping[cell.userValue] ?? '${cell.userValue}';
+      String symbol = mapping[cell.userValue!] ?? '${cell.userValue}';
 
       return Container(
         decoration: BoxDecoration(

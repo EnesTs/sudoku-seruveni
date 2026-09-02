@@ -944,6 +944,16 @@ class _ClassicSudokuScreenState extends State<ClassicSudokuScreen> with WidgetsB
                             bool isSameBox = (_selectedRow != null && _selectedCol != null) &&
                                 (_selectedRow! ~/ 3 == r ~/ 3 && _selectedCol! ~/ 3 == c ~/ 3);
 
+                            // Seçilen hücredeki sayı değeri (Eğer dolu bir hücre seçildiyse)
+                            int? selectedNumber = (_selectedRow != null && _selectedCol != null)
+                                ? _board[_selectedRow!][_selectedCol!].userValue
+                                : null;
+
+                            // Bu hücredeki sayı, seçilen hücredeki sayıyla aynı mı? (Parıldama efekti için)
+                            bool isSameNumber = selectedNumber != null && 
+                                cell.userValue != null && 
+                                cell.userValue == selectedNumber;
+
                             bool isConflict = _highlightedConflictCells.contains(cellKey);
                             bool isJustCompletedGroup = _recentlyCompletedGroupCells.contains(cellKey);
 
@@ -952,10 +962,12 @@ class _ClassicSudokuScreenState extends State<ClassicSudokuScreen> with WidgetsB
                               bgColor = Colors.red.shade300;
                             } else if (isJustCompletedGroup) {
                               bgColor = Colors.amber.shade300;
+                            } else if (isSameNumber) {
+                              bgColor = Colors.amber.withOpacity(0.35); // Aynı sayıların parıldama rengi
                             } else if (isSelected) {
-                              bgColor = currentTheme.selectedCellColor;
+                              bgColor = Colors.amber.withOpacity(0.15); // Seçilen karenin arka planı
                             } else if (isSameRowOrCol || isSameBox) {
-                              bgColor = currentTheme.selectedCellColor.withOpacity(0.35);
+                              bgColor = currentTheme.selectedCellColor.withOpacity(0.25);
                             }
 
                             BorderSide thickBorder = BorderSide(color: currentTheme.gridBorderColor, width: 2.0);
@@ -970,18 +982,21 @@ class _ClassicSudokuScreenState extends State<ClassicSudokuScreen> with WidgetsB
                                 });
                               },
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
+                                duration: const Duration(milliseconds: 200),
                                 decoration: BoxDecoration(
                                   color: bgColor,
-                                  border: Border(
-                                    top: r % 3 == 0 ? thickBorder : thinBorder,
-                                    left: c % 3 == 0 ? thickBorder : thinBorder,
-                                    bottom: r == 8 ? thickBorder : BorderSide.none,
-                                    right: c == 8 ? thickBorder : BorderSide.none,
-                                  ),
+                                  // Seçilen kareye net altın sarısı çerçeve (3.0 kalınlık)
+                                  border: isSelected
+                                      ? Border.all(color: const Color(0xFFFFD700), width: 3.0)
+                                      : Border(
+                                          top: r % 3 == 0 ? thickBorder : thinBorder,
+                                          left: c % 3 == 0 ? thickBorder : thinBorder,
+                                          bottom: r == 8 ? thickBorder : BorderSide.none,
+                                          right: c == 8 ? thickBorder : BorderSide.none,
+                                        ),
                                 ),
                                 child: Center(
-                                  child: _buildCellContent(cell, currentTheme),
+                                  child: _buildCellContent(cell, currentTheme, isSameNumber),
                                 ),
                               ),
                             );
@@ -1164,17 +1179,17 @@ class _ClassicSudokuScreenState extends State<ClassicSudokuScreen> with WidgetsB
     );
   }
 
-  Widget _buildCellContent(ClassicCell cell, AppTheme theme) {
+  Widget _buildCellContent(ClassicCell cell, AppTheme theme, bool isSameNumber) {
     if (cell.userValue != null) {
       bool isWrong = !cell.isInitial && cell.userValue != cell.value;
       return Text(
         '${cell.userValue}',
         style: TextStyle(
           fontSize: 22,
-          fontWeight: cell.isInitial ? FontWeight.bold : FontWeight.normal,
+          fontWeight: (cell.isInitial || isSameNumber) ? FontWeight.bold : FontWeight.normal,
           color: cell.isInitial
               ? Colors.black
-              : (isWrong ? Colors.red : theme.primaryColor),
+              : (isWrong ? Colors.red : (isSameNumber ? Colors.amber.shade900 : theme.primaryColor)),
         ),
       );
     } else if (cell.notes.isNotEmpty) {

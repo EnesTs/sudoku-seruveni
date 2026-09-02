@@ -17,7 +17,7 @@ class ClassicTimeAttackScreen extends StatefulWidget {
   State<ClassicTimeAttackScreen> createState() => _ClassicTimeAttackScreenState();
 }
 
-class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> {
+class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> with WidgetsBindingObserver {
   List<List<ClassicCell>>? _board;
   Timer? _gameTimer;
 
@@ -50,8 +50,23 @@ class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHighScoreAndStars();
     _checkSavedGame();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _gameTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _saveGameState();
+    }
   }
 
   Future<void> _loadHighScoreAndStars() async {
@@ -264,12 +279,6 @@ class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> {
     });
     _updateCompletedNumbers();
     _saveGameState();
-  }
-
-  @override
-  void dispose() {
-    _gameTimer?.cancel();
-    super.dispose();
   }
 
   void _startTimer() {
@@ -892,6 +901,17 @@ class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> {
                                   bool isSameBox = (_selectedRow != null && _selectedCol != null) &&
                                       (_selectedRow! ~/ 3 == r ~/ 3 && _selectedCol! ~/ 3 == c ~/ 3);
 
+                                  // Seçili hücredeki sayıyı bulma (Boş hücrelerde sayı aranmaz)
+                                  int? selectedNumber;
+                                  if (_selectedRow != null && _selectedCol != null && _board != null) {
+                                    ClassicCell selectedCell = _board![_selectedRow!][_selectedCol!];
+                                    selectedNumber = selectedCell.userValue ?? (selectedCell.isInitial ? selectedCell.value : null);
+                                  }
+
+                                  int? currentCellNum = cell.userValue ?? (cell.isInitial ? cell.value : null);
+                                  // Sadece dolu ve eşleşen sayılar yanacak (Boş hücreler asla yanmaz)
+                                  bool isSameNumber = selectedNumber != null && currentCellNum != null && currentCellNum == selectedNumber;
+
                                   bool isConflict = _highlightedConflictCells.contains(cellKey);
                                   bool isGoldFlash = _goldFlashCells.contains(cellKey);
 
@@ -902,12 +922,27 @@ class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> {
                                     bgColor = Colors.red.shade300;
                                   } else if (isSelected) {
                                     bgColor = currentTheme.selectedCellColor;
+                                  } else if (isSameNumber) {
+                                    // Aynı sayıların net görünmesi için opaklık oranı artırıldı
+                                    bgColor = currentTheme.selectedCellColor.withOpacity(0.85);
                                   } else if (isSameRowOrCol || isSameBox) {
-                                    bgColor = currentTheme.selectedCellColor.withOpacity(0.35);
+                                    bgColor = currentTheme.selectedCellColor.withOpacity(0.3);
                                   }
 
                                   BorderSide thickBorder = BorderSide(color: currentTheme.gridBorderColor, width: 2.0);
                                   BorderSide thinBorder = BorderSide(color: currentTheme.gridBorderColor.withOpacity(0.3), width: 1.0);
+
+                                  bool isEmptyAndSelected = isSelected && cell.userValue == null && !cell.isInitial;
+                                  BoxBorder customBorder = Border(
+                                    top: r % 3 == 0 ? thickBorder : thinBorder,
+                                    left: c % 3 == 0 ? thickBorder : thinBorder,
+                                    bottom: r == 8 ? thickBorder : BorderSide.none,
+                                    right: c == 8 ? thickBorder : BorderSide.none,
+                                  );
+
+                                  if (isEmptyAndSelected) {
+                                    customBorder = Border.all(color: Colors.amber.shade700, width: 2.5);
+                                  }
 
                                   return GestureDetector(
                                     onTap: () {
@@ -918,15 +953,19 @@ class _ClassicTimeAttackScreenState extends State<ClassicTimeAttackScreen> {
                                       });
                                     },
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(milliseconds: 200),
                                       decoration: BoxDecoration(
                                         color: bgColor,
-                                        border: Border(
-                                          top: r % 3 == 0 ? thickBorder : thinBorder,
-                                          left: c % 3 == 0 ? thickBorder : thinBorder,
-                                          bottom: r == 8 ? thickBorder : BorderSide.none,
-                                          right: c == 8 ? thickBorder : BorderSide.none,
-                                        ),
+                                        border: customBorder,
+                                        boxShadow: isEmptyAndSelected
+                                            ? [
+                                                BoxShadow(
+                                                  color: Colors.amber.withOpacity(0.5),
+                                                  blurRadius: 6,
+                                                  spreadRadius: 1,
+                                                )
+                                              ]
+                                            : null,
                                       ),
                                       child: Center(child: _buildCellContent(cell, currentTheme)),
                                     ),
